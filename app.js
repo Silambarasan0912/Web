@@ -3,7 +3,8 @@ const express = require("express");
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 const app = express();
 const port = 3000;
@@ -34,28 +35,30 @@ app.get("/login", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  const user1 = new User({
-    email: req.body.usermail,
-    password: md5(req.body.password),
-  });
-  insertUsers();
-  res.render("secrets");
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    const user1 = new User({
+      email: req.body.usermail,
+      password: hash,
+    });
+    insertUsers();
+    res.render("secrets");
 
-  function insertUsers() {
-    try {
-      const response = user1.save();
-      if (response) {
-        res.render("secrets");
+    function insertUsers() {
+      try {
+        const response = user1.save();
+        if (response) {
+          res.render("secrets");
+        }
+      } catch (err) {
+        console.log(err);
       }
-    } catch (err) {
-      console.log(err);
     }
-  }
+  });
 });
 
 app.post("/login", (req, res) => {
   const usermail = req.body.usermail;
-  const password = md5(req.body.password);
+  const password = req.body.password;
 
   validateLogin();
 
@@ -63,8 +66,12 @@ app.post("/login", (req, res) => {
     try {
       const founduser = await User.findOne({ email: usermail });
       // console.log(founduser);
-      if (founduser && founduser.password === password) {
-        res.render("secrets");
+      if (founduser) {
+        bcrypt.compare(password, founduser.password, function (err, result) {
+          if (result === true) {
+            res.render("secrets");
+          }
+        });
       } else {
         console.log("Incorrect password or user not found");
       }
